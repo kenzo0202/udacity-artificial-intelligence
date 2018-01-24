@@ -1,5 +1,6 @@
 
 from utils import *
+from collections import Counter
 
 
 row_units = [cross(r, cols) for r in rows]
@@ -15,6 +16,36 @@ peers = dict((s, set(sum(units[s],[]))-set([s])) for s in boxes)
 
 
 def naked_twins(values):
+    # 指定したboxのpeersを調べる
+    # もし同じ組み合わせが存在する時
+    # そのボックスが存在するUnitの中から、指定した数字が存在する場合、削除する
+    # for box in values.keys():
+    #     for peer in peers[box]:
+    #         if values[box] == values[peer]:
+    #             for target in peers[box]:
+    #                 values[target].strip(values[box])
+
+    # unitlistの中でそれぞれのunitを調べる
+    # 数あるボックスの中で、同じvalueのものが存在しないか調べる
+    for unit in unitlist:
+        double_value = Counter([values[box] for box in unit])
+        twins_value = []
+        for value, cnt in double_value.most_common():
+            if cnt > 1 and len(value) == 2:
+                twins_value.append(value)
+
+        if not twins_value:
+            continue
+        else:
+            for box in unit:
+                if values[box] not in twins_value and len(values[box]) > 1:
+                    for val in twins_value:
+                        for digit in val:
+                            values[box] = values[box].replace(digit, "")
+    return values
+
+
+
     """Eliminate values using the naked twins strategy.
 
     Parameters
@@ -41,93 +72,74 @@ def naked_twins(values):
     and because it is simpler (since the reduce_puzzle function already calls this
     strategy repeatedly).
     """
-    # TODO: Implement this function!
-    raise NotImplementedError
 
 
 def eliminate(values):
-    """Apply the eliminate strategy to a Sudoku puzzle
+    # 一つの数字のとき
+    # row col 3×3 のpeersから数字を除去する
+    solved_values = []
+    for key, value in values.items():
+        if len(value) == 1:
+            solved_values.append(key)
 
-    The eliminate strategy says that if a box has a value assigned, then none
-    of the peers of that box can have the same value.
+    for box in solved_values:
+        digit = values[box]
+        for peer in peers[box]:
+            values[peer] = values[peer].replace(digit, '')
 
-    Parameters
-    ----------
-    values(dict)
-        a dictionary of the form {'box_name': '123456789', ...}
-
-    Returns
-    -------
-    dict
-        The values dictionary with the assigned values eliminated from peers
-    """
-    # TODO: Copy your code from the classroom to complete this function
-    raise NotImplementedError
+    return values
 
 
 def only_choice(values):
-    """Apply the only choice strategy to a Sudoku puzzle
+     for unit in unitlist:
+        for num in list("123456789"):
+            dplace = [box for box in unit if num in values[box]]
+            if len(dplace) == 1:
+                values[dplace[0]] = num
 
-    The only choice strategy says that if only one box in a unit allows a certain
-    digit, then that box must be assigned that digit.
-
-    Parameters
-    ----------
-    values(dict)
-        a dictionary of the form {'box_name': '123456789', ...}
-
-    Returns
-    -------
-    dict
-        The values dictionary with all single-valued boxes assigned
-
-    Notes
-    -----
-    You should be able to complete this function by copying your code from the classroom
-    """
-    # TODO: Copy your code from the classroom to complete this function
-    raise NotImplementedError
+     return values
 
 
 def reduce_puzzle(values):
-    """Reduce a Sudoku puzzle by repeatedly applying all constraint strategies
+    stalled = False
+    while not stalled:
+        # Check how many boxes have a determined value
+        solved_values_before = len([box for box in values.keys() if len(values[box]) == 1])
 
-    Parameters
-    ----------
-    values(dict)
-        a dictionary of the form {'box_name': '123456789', ...}
+        # Your code here: Use the Eliminate Strategy
+        eliminate(values)
 
-    Returns
-    -------
-    dict or False
-        The values dictionary after continued application of the constraint strategies
-        no longer produces any changes, or False if the puzzle is unsolvable 
-    """
-    # TODO: Copy your code from the classroom and modify it to complete this function
-    raise NotImplementedError
+        # Your code here: Use the Only Choice Strategy
+        only_choice(values)
+
+        # Check how many boxes have a determined value, to compare
+        solved_values_after = len([box for box in values.keys() if len(values[box]) == 1])
+        # If no new values were added, stop the loop.
+        stalled = solved_values_before == solved_values_after
+        # Sanity check, return False if there is a box with zero available values:
+        if len([box for box in values.keys() if len(values[box]) == 0]):
+            return False
+    return values
 
 
 def search(values):
-    """Apply depth first search to solve Sudoku puzzles in order to solve puzzles
-    that cannot be solved by repeated reduction alone.
 
-    Parameters
-    ----------
-    values(dict)
-        a dictionary of the form {'box_name': '123456789', ...}
-
-    Returns
-    -------
-    dict or False
-        The values dictionary with all boxes assigned or False
-
-    Notes
-    -----
-    You should be able to complete this function by copying your code from the classroom
-    and extending it to call the naked twins strategy.
-    """
-    # TODO: Copy your code from the classroom to complete this function
-    raise NotImplementedError
+    "Using depth-first search and propagation, try all possible values."
+    # First, reduce the puzzle using the previous function
+    values = reduce_puzzle(values)
+    if values is False:
+        return False  ## Failed earlier
+    if all(len(values[s]) == 1 for s in boxes):
+        return values  ## Solved!
+    # Choose one of the unfilled squares with the fewest possibilities
+    n, s = min((len(values[s]), s) for s in boxes if len(values[s]) > 1)
+    # Now use recurrence to solve each one of the resulting sudokus, and
+    for value in values[s]:
+        new_sudoku = values.copy()
+        new_sudoku[s] = value
+        attempt = search(new_sudoku)
+        if attempt:
+            return attempt
 
 
 def solve(grid):
@@ -158,6 +170,7 @@ if __name__ == "__main__":
 
     try:
         import PySudoku
+
         PySudoku.play(grid2values(diag_sudoku_grid), result, history)
 
     except SystemExit:
